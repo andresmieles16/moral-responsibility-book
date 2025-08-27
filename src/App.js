@@ -381,38 +381,67 @@ const Quiz = ({ questions, onComplete, chapterTitle }) => {
   };
 
   if (showResults) {
+    const isApproved = score >= 4;
+    
     return (
       <div className="bg-white rounded-lg shadow-lg p-6">
         <div className="text-center">
           <div className="text-6xl mb-4">
-            {score >= questions.length * 0.8 ? '🎉' : score >= questions.length * 0.6 ? '👍' : '📚'}
+            {isApproved ? '🎉' : '😔'}
           </div>
-          <h3 className="text-2xl font-bold text-red-700 mb-2">
+          <h3 className="text-2xl font-bold mb-2" style={{color: isApproved ? '#16a34a' : '#dc2626'}}>
             {chapterTitle} - Resultados
           </h3>
           <p className="text-xl mb-4">
             Obtuviste {score} de {questions.length} preguntas correctas
           </p>
-          <p className="text-lg text-gray-600 mb-6">
-            {score >= questions.length * 0.8 ? '¡Excelente trabajo!' : 
-             score >= questions.length * 0.6 ? '¡Buen trabajo!' : 
-             '¡Sigue estudiando!'}
-          </p>
-          <div className="flex gap-4 justify-center">
-            <button
-              onClick={resetQuiz}
-              className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
-            >
-              <RotateCcw size={20} />
-              Reintentar
-            </button>
-            <button
-              onClick={() => onComplete(score, questions.length)}
-              className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
-            >
-              Continuar
-            </button>
-          </div>
+          
+          {isApproved ? (
+            <div>
+              <p className="text-lg text-green-600 font-semibold mb-6">
+                ¡Excelente! Has aprobado este capítulo
+              </p>
+              <div className="flex gap-4 justify-center">
+                <button
+                  onClick={resetQuiz}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                >
+                  <RotateCcw size={20} />
+                  Mejorar puntuación
+                </button>
+                <button
+                  onClick={() => onComplete(score, questions.length)}
+                  className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  Continuar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <p className="text-lg text-red-600 font-semibold mb-4">
+                Necesitas al menos 4 respuestas correctas para aprobar
+              </p>
+              <p className="text-gray-600 mb-6">
+                Revisa el contenido del capítulo e inténtalo nuevamente
+              </p>
+              <div className="flex gap-4 justify-center">
+                <button
+                  onClick={resetQuiz}
+                  className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+                >
+                  <RotateCcw size={20} />
+                  Intentar nuevamente
+                </button>
+                <button
+                  onClick={() => onComplete(score, questions.length)}
+                  className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                  Revisar contenido
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -784,18 +813,34 @@ const MoralResponsibilityBook = () => {
 
   const handleQuizComplete = (score, totalQuestions) => {
     const chapterId = currentChapterData.id;
-    setCompletedChapters(prev => ({ ...prev, [chapterId]: true }));
+    const minRequiredScore = 4; // Mínimo 4 de 5 preguntas correctas
+    
     setChapterScores(prev => ({ ...prev, [chapterId]: { score, totalQuestions } }));
-    setShowQuiz(false);
+    
+    if (score >= minRequiredScore) {
+      // Si aprobó, marcar como completado
+      setCompletedChapters(prev => ({ ...prev, [chapterId]: true }));
+      setShowQuiz(false);
 
-    // Check if all chapters are completed
-    if (completedCount + 1 === totalChapters) {
-      setShowUserForm(true);
+      // Verificar si puede generar certificado (completó todos y tiene 16/20 o más)
+      const newCompletedCount = Object.keys(completedChapters).length + 1;
+      if (newCompletedCount === totalChapters) {
+        const totalScore = getTotalScore() + score;
+        if (totalScore >= 16) {
+          setShowUserForm(true);
+        }
+      }
+    } else {
+      // Si no aprobó, no marcar como completado pero mostrar mensaje
+      setShowQuiz(false);
     }
   };
 
   const handleCertificateRequest = () => {
-    if (userName && userID) {
+    const totalScore = getTotalScore();
+    const totalQuestions = getTotalQuestions();
+    
+    if (userName && userID && totalScore >= 16) {
       setShowCertificate(true);
       setShowUserForm(false);
     }
@@ -906,12 +951,15 @@ const MoralResponsibilityBook = () => {
                 })}
               </nav>
 
-              {completedCount === totalChapters && (
+              {completedCount === totalChapters && getTotalScore() >= 16 && (
                 <div className="mt-6 p-4 bg-gradient-to-r from-green-100 to-green-200 rounded-lg border border-green-300">
                   <div className="text-center">
                     <Award className="mx-auto text-green-600 mb-2" size={24} />
                     <p className="text-sm font-semibold text-green-800">
-                      ¡Felicitaciones! Has completado todos los capítulos
+                      ¡Felicitaciones! Has aprobado el curso
+                    </p>
+                    <p className="text-xs text-green-700 mb-2">
+                      Puntuación: {getTotalScore()}/20
                     </p>
                     <button
                       onClick={() => setShowUserForm(true)}
@@ -919,6 +967,23 @@ const MoralResponsibilityBook = () => {
                     >
                       Obtener Certificado
                     </button>
+                  </div>
+                </div>
+              )}
+
+              {completedCount === totalChapters && getTotalScore() < 16 && (
+                <div className="mt-6 p-4 bg-gradient-to-r from-red-100 to-red-200 rounded-lg border border-red-300">
+                  <div className="text-center">
+                    <div className="text-red-600 mb-2">😔</div>
+                    <p className="text-sm font-semibold text-red-800 mb-2">
+                      Puntuación insuficiente
+                    </p>
+                    <p className="text-xs text-red-700 mb-2">
+                      Tienes {getTotalScore()}/20 puntos. Necesitas mínimo 16 puntos.
+                    </p>
+                    <p className="text-xs text-red-600">
+                      Repite las evaluaciones para mejorar tu puntuación
+                    </p>
                   </div>
                 </div>
               )}
@@ -984,18 +1049,24 @@ const MoralResponsibilityBook = () => {
 
                     {/* Action Buttons */}
                     <div className="mt-8 flex justify-between items-center pt-6 border-t border-gray-200">
-                      <div className="text-sm text-gray-600">
-                        {completedChapters[currentChapterData.id] && (
+                    <div className="text-sm text-gray-600">
+                        {completedChapters[currentChapterData.id] ? (
                           <span className="inline-flex items-center gap-2 text-green-600">
                             <Award size={16} />
-                            Capítulo completado
+                            Capítulo aprobado
                             {chapterScores[currentChapterData.id] && (
                               <span>
                                 - Puntuación: {chapterScores[currentChapterData.id].score}/{chapterScores[currentChapterData.id].totalQuestions}
                               </span>
                             )}
                           </span>
-                        )}
+                        ) : chapterScores[currentChapterData.id] && chapterScores[currentChapterData.id].score < 4 ? (
+                          <span className="inline-flex items-center gap-2 text-red-600">
+                            <X size={16} />
+                            No aprobado - Puntuación: {chapterScores[currentChapterData.id].score}/{chapterScores[currentChapterData.id].totalQuestions}
+                            <span className="text-xs">(Necesitas mínimo 4/5)</span>
+                          </span>
+                        ) : null}
                       </div>
 
                       <button
@@ -1052,6 +1123,16 @@ const MoralResponsibilityBook = () => {
                   placeholder="Ingresa tu número de cédula"
                 />
               </div>
+
+              <div className="bg-green-50 p-3 rounded-lg border border-green-200">
+                <div className="flex items-center gap-2 text-green-700">
+                  <Award size={20} />
+                  <div>
+                    <p className="font-semibold">¡Curso aprobado!</p>
+                    <p className="text-sm">Puntuación final: {getTotalScore()}/20 puntos</p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="flex gap-3 mt-6">
@@ -1063,7 +1144,7 @@ const MoralResponsibilityBook = () => {
               </button>
               <button
                 onClick={handleCertificateRequest}
-                disabled={!userName || !userID}
+                disabled={!userName || !userID || getTotalScore() < 16}
                 className="flex-1 bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Generar Certificado
